@@ -312,6 +312,9 @@ button {
 /* 3D plochy */
 .stage {
   position: relative;
+  /* pevná hranice: 3D z rámečku nikdy nevyjede (na mobilu je plátno uvnitř) */
+  overflow: hidden;
+  isolation: isolate;
 }
 .stage .fallback {
   display: none;

@@ -4,17 +4,20 @@ import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { controls } from "./state";
 
-/* Jedno prostředí pro odlesky, sdílené všemi views (každý view má vlastní scénu). */
-let envTex: THREE.Texture | null = null;
+/* Prostředí pro odlesky, jedno na každý WebGL kontext (na desktopu je kontext jeden pro všechny views,
+   na mobilu má každý rámeček vlastní; textura z PMREM jinému kontextu nepatří). */
+const envByGl = new WeakMap<THREE.WebGLRenderer, THREE.Texture>();
 
 export function Env({ intensity = 0.5 }: { intensity?: number }) {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   useLayoutEffect(() => {
+    let envTex = envByGl.get(gl);
     if (!envTex) {
       const pm = new THREE.PMREMGenerator(gl);
       envTex = pm.fromScene(new RoomEnvironment(), 0.04).texture;
       pm.dispose();
+      envByGl.set(gl, envTex);
     }
     scene.environment = envTex;
     scene.environmentIntensity = intensity;

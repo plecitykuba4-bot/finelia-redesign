@@ -110,7 +110,8 @@ export default function Shield() {
     const g = root.current!;
     const intro = smooth(t / 1.1);
     g.rotation.set(c.rx + Math.sin(t * 0.6) * 0.03, c.ry + (1 - intro) * -0.9, Math.sin(t * 0.45) * 0.02);
-    g.position.y = Math.sin(t * 0.9) * 0.05 - scene.heroOut * 0.4;
+    // štít zůstává na místě v panelu, při odjezdu hero se jen pootočí
+    g.position.y = Math.sin(t * 0.9) * 0.04;
     g.scale.setScalar(0.85 + 0.15 * smooth(t / 0.9));
 
     bars.current.forEach((b, i) => {

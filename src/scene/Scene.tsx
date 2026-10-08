@@ -7,6 +7,7 @@ import Shield, { shieldCam } from "./Shield";
 import Papers, { papersCam } from "./Papers";
 import { ICONS } from "./Icons";
 import { MOMENT_SCENES } from "./Moments3D";
+import MobileScene from "./MobileScene";
 
 /* Jeden WebGL kontext pro celou stránku. Každá 3D ukázka je View, které kreslí
    do obdélníku svého DOM prvku. Snímek pohání ticker GSAPu hned po Lenisu,
@@ -46,13 +47,27 @@ function Precompile() {
   return null;
 }
 
+/* Na dotykových zařízeních vlastní plátno v každém rámečku (viz MobileScene), jinak jedno sdílené. */
+const touch = typeof matchMedia !== "undefined" && matchMedia("(hover: none)").matches;
+
 export default function Scene() {
+  if (touch) {
+    return (
+      <MobileScene
+        stages={[
+          { slot: slots.hero, cam: shieldCam, C: Shield },
+          ...MOMENT_SCENES.map(({ C, cam }, i) => ({ slot: slots.moments[i], cam, C })),
+          ...ICONS.map(({ C, cam }, i) => ({ slot: slots.icons[i], cam, C })),
+          { slot: slots.papers, cam: papersCam, C: Papers },
+        ]}
+      />
+    );
+  }
   return (
     <Canvas
       className="gl"
       frameloop="never"
-      // na telefonech nižší rozlišení 3D (šetří GPU a baterii, rozdíl na malém displeji není vidět)
-      dpr={[1, matchMedia("(hover: none)").matches ? 1.5 : 2]}
+      dpr={[1, 2]}
       gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
       onCreated={({ gl }) => void (gl.autoClear = false)}
       style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 5 }}
