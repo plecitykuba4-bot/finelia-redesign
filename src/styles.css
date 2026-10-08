@@ -1198,3 +1198,34 @@ button {
     transform: none;
   }
 }
+
+/* mobil: úpravy, které musí přebít přesnější desktopové selektory */
+@media (max-width: 860px) {
+  .moments .mo-head {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .moments .lead {
+    font-size: 0.98rem;
+  }
+  .stage-moment {
+    height: 170px;
+  }
+  /* 3D panel u služeb přes celou šířku by byl moc vysoký */
+  .stage-icon {
+    aspect-ratio: auto;
+    height: 170px;
+  }
+  .stage-papers {
+    height: 36vh;
+  }
+  .pr-step,
+  .pr-step:first-child {
+    min-height: 30vh;
+    padding-top: 3vh;
+  }
+  .hero-facts dt {
+    font-size: 13.5px;
+    white-space: nowrap;
+  }
+}

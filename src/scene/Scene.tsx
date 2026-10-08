@@ -51,7 +51,8 @@ export default function Scene() {
     <Canvas
       className="gl"
       frameloop="never"
-      dpr={[1, 2]}
+      // na telefonech nižší rozlišení 3D (šetří GPU a baterii, rozdíl na malém displeji není vidět)
+      dpr={[1, matchMedia("(hover: none)").matches ? 1.5 : 2]}
       gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
       onCreated={({ gl }) => void (gl.autoClear = false)}
       style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 5 }}

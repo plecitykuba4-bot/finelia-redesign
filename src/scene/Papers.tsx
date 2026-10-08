@@ -67,6 +67,13 @@ export default function Papers() {
 
   useFrame((st, dt) => {
     dt = Math.min(dt, 0.05);
+    // na úzkém displeji je panel nízký, papíry přiblížit
+    const cam = st.camera as THREE.PerspectiveCamera;
+    const zoom = innerWidth < 860 ? 1.3 : 1;
+    if (cam.zoom !== zoom) {
+      cam.zoom = zoom;
+      cam.updateProjectionMatrix();
+    }
     const t = st.clock.elapsedTime;
     const s = slots.papers;
     const c = cur.current;

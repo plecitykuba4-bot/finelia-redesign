@@ -585,10 +585,22 @@ export default function App() {
     startSmoothScroll();
     const off = trackPointer();
     const offRv = revealOnView();
+    // na dotykových zařízeních není najetí myší: 3D v kartě se rozpohybuje, když karta projíždí středem obrazovky
+    let io: IntersectionObserver | undefined;
+    if (matchMedia("(hover: none)").matches) {
+      const map = new Map<Element, Slot>();
+      document.querySelectorAll(".svc").forEach((el, i) => slots.icons[i] && map.set(el, slots.icons[i]));
+      document.querySelectorAll(".mo-card").forEach((el, i) => slots.moments[i] && map.set(el, slots.moments[i]));
+      io = new IntersectionObserver((es) => es.forEach((e) => map.get(e.target) && (map.get(e.target)!.hover = e.isIntersecting)), {
+        rootMargin: "-35% 0px -35% 0px",
+      });
+      map.forEach((_, el) => io!.observe(el));
+    }
     const t = setTimeout(() => ScrollTrigger.refresh(), 400);
     return () => {
       off();
       offRv();
+      io?.disconnect();
       clearTimeout(t);
     };
   }, []);
