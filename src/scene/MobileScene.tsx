@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import type { Slot } from "./state";
+import { slots, type Slot } from "./state";
 import type { Cam } from "./View";
 
 /* Mobil: každá 3D ukázka má vlastní plátno přímo uvnitř svého rámečku.
@@ -42,16 +42,26 @@ function Stage({ slot, cam, C }: { slot: Slot; cam: Cam; C: () => React.JSX.Elem
   const el = slot.ref.current;
   const [visible, setVisible] = useState(false);
   const [ready, setReady] = useState(false);
-  const onReady = useCallback(() => setReady(true), []);
+  const onReady = useCallback(() => {
+    setReady(true);
+    if (slot === slots.hero) dispatchEvent(new Event("hero-3d"));
+  }, [slot]);
   const on = useRef(false);
   on.current = visible && ready;
+  // plátno se vytvoří, až když je rámeček blízko obrazovky (hero hned); devět kontextů naráz by start zdrželo
+  const [near, setNear] = useState(false);
   useEffect(() => {
     if (!el) return;
     const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), { rootMargin: "120px 0px" });
+    const far = new IntersectionObserver(([e]) => e.isIntersecting && setNear(true), { rootMargin: "700px 0px" });
     io.observe(el);
-    return () => io.disconnect();
+    far.observe(el);
+    return () => {
+      io.disconnect();
+      far.disconnect();
+    };
   }, [el]);
-  if (!el) return null;
+  if (!el || !near) return null;
   return createPortal(
     <Canvas
       className="stage-gl"
@@ -61,7 +71,10 @@ function Stage({ slot, cam, C }: { slot: Slot; cam: Cam; C: () => React.JSX.Elem
       dpr={[1, 1.5]}
       gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
       camera={{ fov: cam.fov, position: cam.pos, near: 0.1, far: 60 }}
-      onCreated={({ camera }) => camera.lookAt(...cam.look)}
+      onCreated={({ camera, gl }) => {
+        camera.lookAt(...cam.look);
+        gl.debug.checkShaderErrors = false;
+      }}
       style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
     >
       <Compile onReady={onReady} />

@@ -1,26 +1,111 @@
 import { useLayoutEffect, useMemo } from "react";
 import { useThree, type ThreeElements } from "@react-three/fiber";
 import * as THREE from "three";
-import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { controls } from "./state";
+
+/* Lehké „studio“ pro odlesky: šedá místnost a čtyři světelné panely, všechno z jednoho jednoduchého
+   materiálu. RoomEnvironment z three kompiluje víc programů a na Windows trvala přes sekundu. */
+function studio() {
+  const s = new THREE.Scene();
+  const box = new THREE.BoxGeometry();
+  const add = (color: string, k: number, pos: [number, number, number], scale: [number, number, number]) => {
+    const m = new THREE.Mesh(box, new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(k), side: THREE.DoubleSide }));
+    m.position.set(...pos);
+    m.scale.set(...scale);
+    s.add(m);
+  };
+  add("#9aa19e", 1, [0, 0, 0], [12, 10, 12]); // místnost
+  add("#ffffff", 16, [0, 4.9, 0], [7, 0.1, 7]); // strop
+  add("#ffffff", 7, [-5.9, 1, 0], [0.1, 5, 6]); // okno vlevo
+  add("#ffffff", 4, [5.9, 2, 1.5], [0.1, 3, 4]); // panel vpravo
+  add("#ffffff", 5, [0, 1, 5.9], [6, 4, 0.1]); // panel za kamerou
+  return s;
+}
 
 /* Prostředí pro odlesky, jedno na každý WebGL kontext (na desktopu je kontext jeden pro všechny views,
    na mobilu má každý rámeček vlastní; textura z PMREM jinému kontextu nepatří). */
 const envByGl = new WeakMap<THREE.WebGLRenderer, THREE.Texture>();
+const ENV_SIZE = 64;
+// studio svítí víc než dřívější RoomEnvironment; tímhle se vrací na původní jas scén
+const ENV_GAIN = 0.27;
+
+/* Odlesky jsou předpočítané v public/env.bin (hlavička šířka, výška; pak pixely RGBE).
+   Soubor vyrobí nastroje/prohlizec/upec-env.mjs z funkce bakeEnv níže. */
+let baked: THREE.DataTexture | null = null;
+
+function decodeEnv(buf: ArrayBuffer) {
+  const dv = new DataView(buf);
+  const w = dv.getUint32(0, true), h = dv.getUint32(4, true);
+  const src = new Uint8Array(buf, 8);
+  const out = new Uint16Array(w * h * 4);
+  const half = THREE.DataUtils.toHalfFloat;
+  const one = half(1);
+  for (let i = 0; i < w * h; i++) {
+    const e = src[i * 4 + 3];
+    const f = e ? Math.pow(2, e - 136) : 0;
+    out[i * 4] = half(Math.min(src[i * 4] * f, 60000));
+    out[i * 4 + 1] = half(Math.min(src[i * 4 + 1] * f, 60000));
+    out[i * 4 + 2] = half(Math.min(src[i * 4 + 2] * f, 60000));
+    out[i * 4 + 3] = one;
+  }
+  const t = new THREE.DataTexture(out, w, h, THREE.RGBAFormat, THREE.HalfFloatType);
+  t.mapping = THREE.CubeUVReflectionMapping;
+  t.magFilter = t.minFilter = THREE.LinearFilter;
+  t.generateMipmaps = false;
+  t.colorSpace = THREE.LinearSRGBColorSpace;
+  t.needsUpdate = true;
+  return t;
+}
+
+export const envReady: Promise<void> = fetch("/env.bin")
+  .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject()))
+  .then((buf) => void (baked = decodeEnv(buf)))
+  .catch(() => {});
+
+/* Jen pro vývoj: spočítá odlesky a vrátí je jako base64 (RGBE), aby šly uložit do souboru. */
+function bakeEnv(gl: THREE.WebGLRenderer) {
+  const pm = new THREE.PMREMGenerator(gl);
+  const rt = pm.fromScene(studio(), 0, 0.1, 100, { size: ENV_SIZE });
+  const w = rt.width, h = rt.height;
+  const px = new Uint16Array(w * h * 4);
+  gl.readRenderTargetPixels(rt, 0, 0, w, h, px);
+  pm.dispose();
+  const out = new Uint8Array(8 + w * h * 4);
+  new DataView(out.buffer).setUint32(0, w, true);
+  new DataView(out.buffer).setUint32(4, h, true);
+  const f = THREE.DataUtils.fromHalfFloat;
+  for (let i = 0; i < w * h; i++) {
+    const r = f(px[i * 4]), g = f(px[i * 4 + 1]), b = f(px[i * 4 + 2]);
+    const m = Math.max(r, g, b);
+    if (m < 1e-30) continue;
+    const e = Math.ceil(Math.log2(m));
+    const k = 256 / Math.pow(2, e);
+    const o = 8 + i * 4;
+    out[o] = Math.min(255, Math.round(r * k));
+    out[o + 1] = Math.min(255, Math.round(g * k));
+    out[o + 2] = Math.min(255, Math.round(b * k));
+    out[o + 3] = e + 128;
+  }
+  let bin = "";
+  for (let i = 0; i < out.length; i += 8192) bin += String.fromCharCode(...out.subarray(i, i + 8192));
+  return btoa(bin);
+}
 
 export function Env({ intensity = 0.5, shadow = false }: { intensity?: number; shadow?: boolean }) {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   useLayoutEffect(() => {
-    let envTex = envByGl.get(gl);
+    // předpočítané odlesky ze souboru nestojí za běhu nic; výpočet PMREM je jen záloha
+    let envTex: THREE.Texture | undefined = baked ?? envByGl.get(gl);
     if (!envTex) {
       const pm = new THREE.PMREMGenerator(gl);
-      envTex = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+      envTex = pm.fromScene(studio(), 0, 0.1, 100, { size: ENV_SIZE }).texture;
       pm.dispose();
       envByGl.set(gl, envTex);
     }
+    if (import.meta.env.DEV) (window as unknown as { __bakeEnv?: () => string }).__bakeEnv = () => bakeEnv(gl);
     scene.environment = envTex;
-    scene.environmentIntensity = intensity;
+    scene.environmentIntensity = intensity * ENV_GAIN;
   }, [gl, scene, intensity]);
   return (
     <>

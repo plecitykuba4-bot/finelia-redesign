@@ -5,7 +5,13 @@ import { CATS, MONTHS_NOM, WD_SHORT, dayKey, daysBetween, fmtDate, fmtWeekday, u
 import { gsap, ScrollTrigger, reducedMotion, revealOnView, scrollToHash, startSmoothScroll } from "./lib/motion";
 import { scene, slots, trackPointer, type Slot } from "./scene/state";
 
-const Scene = lazy(() => import("./scene/Scene"));
+// 3D modul se začne stahovat hned při startu stránky (souběžně s úvodem), připojí se až později
+const sceneChunk = import("./scene/Scene").then(async (m) => {
+  await m.envReady; // předpočítané odlesky
+  performance.mark("3d-chunk");
+  return m;
+});
+const Scene = lazy(() => sceneChunk);
 
 /* Když 3D selže (chunk, WebGL), stránka běží dál bez něj. */
 class Safe extends Component<{ children: React.ReactNode }, { err: boolean }> {
@@ -109,6 +115,12 @@ function Nav() {
 
 function Hero() {
   const root = useRef<HTMLElement>(null);
+  const [live, setLive] = useState(false);
+  useEffect(() => {
+    const on = () => setLive(true);
+    addEventListener("hero-3d", on);
+    return () => removeEventListener("hero-3d", on);
+  }, []);
   useEffect(() => {
     const el = root.current!;
     const st = ScrollTrigger.create({
@@ -117,61 +129,60 @@ function Hero() {
       end: "bottom top",
       onUpdate: (s) => (scene.heroOut = s.progress),
     });
-    // 3D se začne připravovat až po úvodu, aby nic těžkého neběželo souběžně s animací textu
-    const introDone = () => {
-      performance.mark("intro-end");
-      dispatchEvent(new Event("intro-done"));
-    };
+    /* Úvod je čisté CSS (transform a opacity), takže ho prohlížeč animuje na vlákně grafiky
+       a příprava 3D na hlavním vlákně ho nezasekne. Proto se 3D smí chystat hned po jeho spuštění. */
+    const start3d = () => dispatchEvent(new Event("start-3d"));
     if (reducedMotion()) {
-      introDone();
+      start3d();
       return () => st.kill();
     }
-    const tl = gsap.timeline({ paused: true });
-    tl.fromTo(".nav-in > *", { y: -14, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.8, ease: "power3.out", stagger: 0.06 }, 0)
-      .fromTo(el.querySelectorAll(".h1 .w > span"), { yPercent: 110, autoAlpha: 1 }, { yPercent: 0, duration: 1.1, ease: "expo.out", stagger: 0.08 }, 0.1)
-      .fromTo(el.querySelectorAll(".hero-copy [data-in]"), { y: 16, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.9, ease: "power3.out", stagger: 0.09 }, 0.5)
-      .fromTo(el.querySelector(".hero-stage"), { autoAlpha: 0 }, { autoAlpha: 1, duration: 1.4, ease: "power2.out" }, 0.3);
-    tl.eventCallback("onComplete", introDone);
+    let alive = true;
     // start s načteným písmem, ať nadpis během animace neposkočí (nejdéle 700 ms)
     Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 700))]).then(() => {
-      if (tl.isActive() || tl.progress() > 0) return;
+      if (!alive) return;
       performance.mark("intro-start");
-      tl.play();
+      document.documentElement.classList.add("go");
+      // dva snímky náskok, ať animace opravdu běží, než začne těžká práce
+      requestAnimationFrame(() => requestAnimationFrame(start3d));
     });
     return () => {
+      alive = false;
       st.kill();
-      tl.kill();
     };
   }, []);
   const words = HERO.title.split(" ");
   return (
-    <section className="hero" id="top" ref={root}>
+    <section className={`hero${live ? " live" : ""}`} id="top" ref={root}>
       {/* stůl s doklady leží přímo na pozadí hero, není to oddělený rámeček */}
-      <div className="hero-stage" data-in>
+      <div className="hero-stage">
         <Stage slot={slots.hero} className="stage stage-hero" />
       </div>
+      {/* závoj se stejným pozadím jako hero: zakrývá stůl, dokud není 3D připravené, pak se rozplyne */}
+      <div className="hero-veil" aria-hidden="true" />
       <div className="wrap">
         <div className="hero-copy">
           <h1 className="h1">
             {words.map((w, i) => (
               <Fragment key={i}>
                 <span className="w">
-                  <span className={i === words.length - 1 ? "accent" : undefined}>{w}</span>
+                  <span className={i === words.length - 1 ? "accent" : undefined} style={{ "--i": i } as React.CSSProperties}>
+                    {w}
+                  </span>
                 </span>{" "}
               </Fragment>
             ))}
           </h1>
-          <p className="lead" data-in>
+          <p className="lead" data-in style={{ "--i": 0 } as React.CSSProperties}>
             {HERO.lead}
           </p>
-          <ul className="hero-words" data-in>
+          <ul className="hero-words" data-in style={{ "--i": 1 } as React.CSSProperties}>
             {HERO.words.map((w) => (
               <li key={w}>
                 <Check size={14} weight="bold" /> {w}
               </li>
             ))}
           </ul>
-          <div className="hero-cta" data-in>
+          <div className="hero-cta" data-in style={{ "--i": 2 } as React.CSSProperties}>
             <a href="#kontakt" className="btn btn-teal" onClick={go("#kontakt")}>
               {HERO.cta} <ArrowRight size={18} weight="bold" />
             </a>
@@ -624,14 +635,14 @@ function Footer() {
 
 export default function App() {
   const [gl] = useState(webglOk);
-  // 3D (načtení modulu, sestavení scén, kompilace) až po doběhnutí úvodu, nejpozději za 3 s
+  // 3D se začne sestavovat hned, jak se rozběhne úvod (ten je v CSS a hlavní vlákno nepotřebuje)
   const [mount3d, setMount3d] = useState(false);
   useEffect(() => {
     const on = () => setMount3d(true);
-    addEventListener("intro-done", on);
+    addEventListener("start-3d", on);
     const t = setTimeout(on, 3000);
     return () => {
-      removeEventListener("intro-done", on);
+      removeEventListener("start-3d", on);
       clearTimeout(t);
     };
   }, []);

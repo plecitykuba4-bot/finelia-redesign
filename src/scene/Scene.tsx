@@ -1,13 +1,15 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import gsap from "gsap";
-import { markSceneReady, slots } from "./state";
-import { View, precompileAll } from "./View";
+import { slots } from "./state";
+import { View } from "./View";
 import Desk, { deskCam } from "./Desk";
 import Papers, { papersCam } from "./Papers";
 import { ICONS } from "./Icons";
 import { MOMENT_SCENES } from "./Moments3D";
 import MobileScene from "./MobileScene";
+
+export { envReady } from "./shared";
 
 /* Jeden WebGL kontext pro celou stránku. Každá 3D ukázka je View, které kreslí
    do obdélníku svého DOM prvku. Snímek pohání ticker GSAPu hned po Lenisu,
@@ -29,39 +31,28 @@ function Driver() {
   return null;
 }
 
-/* Po připojení všech scén je předkompiluje a ohlásí připravenost (úvod hero na to čeká). */
-function Precompile() {
-  const gl = useThree((s) => s.gl);
-  useEffect(() => {
-    let alive = true;
-    // dva snímky, ať jsou všechny portály a materiály opravdu v grafu scén
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        precompileAll(gl)
-          .catch(() => {})
-          .finally(() => alive && markSceneReady());
-      })
-    );
-    return () => void (alive = false);
-  }, [gl]);
-  return null;
-}
-
 /* Na dotykových zařízeních vlastní plátno v každém rámečku (viz MobileScene), jinak jedno sdílené. */
 const touch = typeof matchMedia !== "undefined" && matchMedia("(hover: none)").matches;
 
+const idle = (fn: () => void) => ("requestIdleCallback" in window ? requestIdleCallback(fn, { timeout: 600 }) : setTimeout(fn, 120));
+
+/* Scény mimo hero: připojují se po jedné, až když je předchozí hotová a prohlížeč má volno. */
+const REST = [
+  ...MOMENT_SCENES.map(({ C, cam }, i) => ({ slot: slots.moments[i], cam, C })),
+  ...ICONS.map(({ C, cam }, i) => ({ slot: slots.icons[i], cam, C })),
+  { slot: slots.papers, cam: papersCam, C: Papers },
+];
+
 export default function Scene() {
+  const [n, setN] = useState(0);
+  const next = useCallback(() => void idle(() => setN((x) => Math.min(x + 1, REST.length))), []);
+  const heroReady = useCallback(() => {
+    performance.mark("3d-ready");
+    dispatchEvent(new Event("hero-3d")); // stránka odhalí stůl
+    next();
+  }, [next]);
   if (touch) {
-    return (
-      <MobileScene
-        stages={[
-          { slot: slots.hero, cam: deskCam, C: Desk },
-          ...MOMENT_SCENES.map(({ C, cam }, i) => ({ slot: slots.moments[i], cam, C })),
-          ...ICONS.map(({ C, cam }, i) => ({ slot: slots.icons[i], cam, C })),
-          { slot: slots.papers, cam: papersCam, C: Papers },
-        ]}
-      />
-    );
+    return <MobileScene stages={[{ slot: slots.hero, cam: deskCam, C: Desk }, ...REST]} />;
   }
   return (
     <Canvas
@@ -70,27 +61,22 @@ export default function Scene() {
       shadows
       dpr={[1, 2]}
       gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
-      onCreated={({ gl }) => void (gl.autoClear = false)}
+      onCreated={({ gl }) => {
+        gl.autoClear = false;
+        // synchronní kontrola shaderů na Windows (ANGLE/D3D) blokuje stovky ms na program
+        gl.debug.checkShaderErrors = false;
+      }}
       style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 5 }}
     >
       <Driver />
-      <View slot={slots.hero} cam={deskCam}>
+      <View slot={slots.hero} cam={deskCam} onReady={heroReady} fade={false}>
         <Desk />
       </View>
-      {MOMENT_SCENES.map(({ C, cam }, i) => (
-        <View key={`m${i}`} slot={slots.moments[i]} cam={cam}>
+      {REST.slice(0, n).map(({ slot, cam, C }, i) => (
+        <View key={i} slot={slot} cam={cam} onReady={next}>
           <C />
         </View>
       ))}
-      {ICONS.map(({ C, cam }, i) => (
-        <View key={i} slot={slots.icons[i]} cam={cam}>
-          <C />
-        </View>
-      ))}
-      <View slot={slots.papers} cam={papersCam}>
-        <Papers />
-      </View>
-      <Precompile />
     </Canvas>
   );
 }

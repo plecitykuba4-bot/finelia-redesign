@@ -52,8 +52,8 @@ export function Coin() {
   const ref = useRef<THREE.Group>(null);
   const speed = useSpeed(0);
   const mats = useMemo(() => {
-    const face = new THREE.MeshPhysicalMaterial({ map: coinFace(gl), metalness: 0.55, roughness: 0.32, clearcoat: 0.8 });
-    const edge = new THREE.MeshPhysicalMaterial({ color: "#c7d2cf", metalness: 0.85, roughness: 0.28 });
+    const face = new THREE.MeshStandardMaterial({ map: coinFace(gl), metalness: 0.55, roughness: 0.32 });
+    const edge = new THREE.MeshStandardMaterial({ color: "#c7d2cf", metalness: 0.85, roughness: 0.28 });
     return [edge, face, face];
   }, [gl]);
   const angle = useRef(0);
@@ -164,10 +164,10 @@ export function Building() {
           <meshStandardMaterial color="#d7e0dd" roughness={0.8} />
         </mesh>
         <RoundedBox args={[BW, BH, BD]} radius={0.03} smoothness={3} position-y={0.05 + BH / 2}>
-          <meshPhysicalMaterial color="#eef2f0" roughness={0.55} clearcoat={0.3} />
+          <meshStandardMaterial color="#eef2f0" roughness={0.55} />
         </RoundedBox>
         <RoundedBox args={[BW + 0.1, 0.09, BD + 0.1]} radius={0.03} smoothness={3} position-y={0.05 + BH + 0.045}>
-          <meshPhysicalMaterial color={controls.teal} roughness={0.35} clearcoat={0.7} />
+          <meshStandardMaterial color={controls.teal} roughness={0.35} />
         </RoundedBox>
         <group position-y={0.05}>
           <instancedMesh
@@ -222,7 +222,7 @@ export function Spiral() {
       <group ref={ref} position-y={-0.95}>
         <mesh position-y={0.95}>
           <cylinderGeometry args={[0.07, 0.07, 2.1, 24]} />
-          <meshPhysicalMaterial color="#c7d2cf" metalness={0.8} roughness={0.3} />
+          <meshStandardMaterial color="#c7d2cf" metalness={0.8} roughness={0.3} />
         </mesh>
         {Array.from({ length: STEPS }, (_, i) => {
           const top = i === STEPS - 1;
@@ -231,7 +231,7 @@ export function Spiral() {
           return (
             <group key={i} rotation-y={i * 0.62} ref={(el) => void (slabs.current[i] = el)}>
               <RoundedBox args={[0.82, 0.09, 0.34]} radius={0.03} smoothness={3} position-x={0.47}>
-                <meshPhysicalMaterial color={col} roughness={0.3} clearcoat={0.8} clearcoatRoughness={0.2} />
+                <meshStandardMaterial color={col} roughness={0.3} />
               </RoundedBox>
             </group>
           );

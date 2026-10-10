@@ -334,7 +334,8 @@ button {
   background-position: -1px -1px;
 }
 
-/* hero: jedna plocha, věci na stole leží přímo na jejím pozadí (žádný oddělený rámeček) */
+/* hero: jedna plocha, věci na stole leží přímo na jejím pozadí (žádný oddělený rámeček).
+   Závoj má totéž pozadí; leží nad 3D plátnem a rozplyne se, až je stůl připravený. */
 .hero {
   position: relative;
   min-height: 100svh;
@@ -342,10 +343,24 @@ button {
   display: flex;
   align-items: center;
   overflow: hidden;
+}
+.hero,
+.hero-veil {
   background: radial-gradient(44% 62% at 74% 56%, #ffffff 0%, rgba(255, 255, 255, 0) 72%), linear-gradient(100deg, var(--bg) 0%, var(--bg) 36%, #e0eeea 100%);
 }
+.hero-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  transition: opacity 0.8s ease-out;
+}
+.hero.live .hero-veil {
+  opacity: 0;
+}
 /* účetní mřížka: vlevo se ztrácí, aby text stál na klidné ploše */
-.hero::before {
+.hero::before,
+.hero-veil::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -358,7 +373,7 @@ button {
 /* text je nad 3D plátnem; obal nechytá myš, aby na stůl šlo najet */
 .hero > .wrap {
   position: relative;
-  z-index: 6;
+  z-index: 7;
   pointer-events: none;
 }
 .hero-copy {
@@ -1241,10 +1256,60 @@ button {
   opacity: 1;
   transform: none;
 }
-.anim .hero [data-in],
-.anim .hero .h1 .w > span,
-.anim .nav-in > * {
-  visibility: hidden;
+/* Úvod hero: jen transform a opacity v CSS animacích (běží na vlákně grafiky, nezasekne je práce v JS).
+   Třída .anim = animace se bude hrát, .go = spusť. */
+.anim .nav-in > *,
+.anim .hero [data-in] {
+  opacity: 0;
+}
+.anim .hero .h1 .w > span {
+  transform: translateY(112%);
+}
+.anim.go .nav-in > * {
+  animation: in-down 0.8s var(--ease) both;
+}
+.anim.go .nav-in > :nth-child(2) {
+  animation-delay: 60ms;
+}
+.anim.go .nav-in > :nth-child(3) {
+  animation-delay: 120ms;
+}
+.anim.go .hero .h1 .w > span {
+  animation: in-up 1.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(100ms + var(--i, 0) * 80ms);
+  will-change: transform;
+}
+.anim.go .hero [data-in] {
+  animation: in-rise 0.9s var(--ease) both;
+  animation-delay: calc(480ms + var(--i, 0) * 90ms);
+}
+@keyframes in-down {
+  from {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes in-up {
+  from {
+    transform: translateY(112%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes in-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* tablet */
@@ -1347,9 +1412,13 @@ button {
     align-items: stretch;
     min-height: 0;
     padding: 108px 0 0;
+  }
+  .hero,
+  .hero-veil {
     background: radial-gradient(90% 40% at 50% 78%, #ffffff 0%, rgba(255, 255, 255, 0) 75%), linear-gradient(180deg, var(--bg) 0%, var(--bg) 44%, #e0eeea 100%);
   }
-  .hero::before {
+  .hero::before,
+  .hero-veil::before {
     -webkit-mask-image: linear-gradient(180deg, transparent 44%, #000 70%);
     mask-image: linear-gradient(180deg, transparent 44%, #000 70%);
   }

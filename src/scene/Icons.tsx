@@ -8,7 +8,7 @@ import { Blob, Env, docTexture, smooth, stampTexture } from "./shared";
 /* Malé 3D ikony u služeb. Každá má klidovou smyčku a akci při najetí na kartu. */
 
 const damp = THREE.MathUtils.damp;
-const glossy = (color: string, rough = 0.35) => <meshPhysicalMaterial color={color} roughness={rough} clearcoat={0.7} clearcoatRoughness={0.25} />;
+const glossy = (color: string, rough = 0.35) => <meshStandardMaterial color={color} roughness={rough} />;
 
 function useHover(i: number) {
   const h = useRef(0);

@@ -58,7 +58,7 @@ function Calculator({ display }: { display: THREE.Texture }) {
   return (
     <group>
       <RoundedBox args={[1.02, 0.1, 1.46]} radius={0.045} smoothness={3} position-y={0.05}>
-        <meshPhysicalMaterial color="#14332f" roughness={0.45} clearcoat={0.4} />
+        <meshStandardMaterial color="#0f2a27" roughness={0.75} />
       </RoundedBox>
       <mesh rotation-x={-Math.PI / 2} position={[0, 0.102, -0.47]}>
         <planeGeometry args={[0.84, 0.3]} />
@@ -66,7 +66,7 @@ function Calculator({ display }: { display: THREE.Texture }) {
       </mesh>
       {keys.map((k, i) => (
         <RoundedBox key={i} args={[0.17, 0.05, 0.17]} radius={0.02} smoothness={2} position={[k.x, 0.12, k.z]}>
-          <meshPhysicalMaterial color={k.color} roughness={0.5} clearcoat={0.3} />
+          <meshStandardMaterial color={k.color} roughness={0.5} />
         </RoundedBox>
       ))}
     </group>
@@ -80,7 +80,7 @@ function Cup() {
     ].map(([r, y]) => new THREE.Vector2(r, y));
     return new THREE.LatheGeometry(p, 48);
   }, []);
-  const ceramic = <meshPhysicalMaterial color="#f7f8f6" roughness={0.25} clearcoat={0.8} clearcoatRoughness={0.15} />;
+  const ceramic = <meshStandardMaterial color="#f7f8f6" roughness={0.25} />;
   return (
     <group>
       <mesh position-y={0.015}>
@@ -107,7 +107,7 @@ function Pen() {
     <group rotation-z={Math.PI / 2}>
       <mesh>
         <cylinderGeometry args={[0.04, 0.04, 1.35, 20]} />
-        <meshPhysicalMaterial color={controls.ink} roughness={0.3} clearcoat={0.8} />
+        <meshStandardMaterial color={controls.ink} roughness={0.3} />
       </mesh>
       <mesh position-y={0.74}>
         <coneGeometry args={[0.04, 0.14, 20]} />
@@ -115,14 +115,14 @@ function Pen() {
       </mesh>
       <mesh position-y={-0.6}>
         <cylinderGeometry args={[0.043, 0.043, 0.16, 20]} />
-        <meshPhysicalMaterial color={controls.teal} roughness={0.3} clearcoat={0.8} />
+        <meshStandardMaterial color={controls.teal} roughness={0.3} />
       </mesh>
     </group>
   );
 }
 
 function StampTool() {
-  const m = (color: string) => <meshPhysicalMaterial color={color} roughness={0.35} clearcoat={0.7} clearcoatRoughness={0.25} />;
+  const m = (color: string) => <meshStandardMaterial color={color} roughness={0.35} />;
   return (
     <>
       <mesh position-y={0.04}>
@@ -169,7 +169,7 @@ export default function Desk() {
     return { edge, mv, messy, neat, moverMat: face(mv), messyMat: face(messy), neatMat: face(neat), plain: face(edge) };
   }, [gl]);
 
-  const st = useRef({ t: 0, i: -1, speed: 1, rx: 0, ry: 0, shown: 0, lastDraw: 0, total: 128400 });
+  const st = useRef({ seen: false, t: 0, i: -1, speed: 1, rx: 0, ry: 0, shown: 0, lastDraw: 0, total: 128400 });
   const from = useMemo(() => new THREE.Vector3(), []);
   const to = useMemo(() => new THREE.Vector3(), []);
 
@@ -188,6 +188,10 @@ export default function Desk() {
     dt = Math.min(dt, 0.05);
     const s = st.current;
     const slot = slots.hero;
+    if (!s.seen && slot.alpha > 0.5) {
+      s.seen = true;
+      performance.mark("3d-hero"); // měření: kdy je stůl poprvé opravdu vidět
+    }
     s.speed = THREE.MathUtils.damp(s.speed, slot.hover ? 1.9 : 1, 3, dt);
     if (!scene.reduced) s.t += dt * s.speed;
 

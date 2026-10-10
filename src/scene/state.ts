@@ -7,9 +7,10 @@ export type Slot = {
   my: number;
   hover: boolean;
   alpha: number; // jak moc je 3D právě vidět (0..1), zapisuje View
+  ready: boolean; // shadery scény jsou zkompilované, smí se kreslit
 };
 
-const slot = (): Slot => ({ ref: { current: null }, mx: 0, my: 0, hover: false, alpha: 0 });
+const slot = (): Slot => ({ ref: { current: null }, mx: 0, my: 0, hover: false, alpha: 0, ready: false });
 
 export const slots = {
   hero: slot(),
@@ -51,8 +52,3 @@ export function trackPointer() {
   addEventListener("pointermove", move, { passive: true });
   return () => removeEventListener("pointermove", move);
 }
-
-/* Připravenost 3D: všechny scény jsou zkompilované a textury nahrané.
-   Dokud není, views nekreslí (první vykreslení by shadery kompilovalo synchronně a stránka by zamrzla). */
-export const flags = { ready: false };
-export const markSceneReady = () => void (flags.ready = true);
