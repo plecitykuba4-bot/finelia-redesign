@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import gsap from "gsap";
 import { markSceneReady, slots } from "./state";
 import { View, precompileAll } from "./View";
-import Shield, { shieldCam } from "./Shield";
+import Desk, { deskCam } from "./Desk";
 import Papers, { papersCam } from "./Papers";
 import { ICONS } from "./Icons";
 import { MOMENT_SCENES } from "./Moments3D";
@@ -55,7 +55,7 @@ export default function Scene() {
     return (
       <MobileScene
         stages={[
-          { slot: slots.hero, cam: shieldCam, C: Shield },
+          { slot: slots.hero, cam: deskCam, C: Desk },
           ...MOMENT_SCENES.map(({ C, cam }, i) => ({ slot: slots.moments[i], cam, C })),
           ...ICONS.map(({ C, cam }, i) => ({ slot: slots.icons[i], cam, C })),
           { slot: slots.papers, cam: papersCam, C: Papers },
@@ -67,14 +67,15 @@ export default function Scene() {
     <Canvas
       className="gl"
       frameloop="never"
+      shadows
       dpr={[1, 2]}
       gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
       onCreated={({ gl }) => void (gl.autoClear = false)}
       style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 5 }}
     >
       <Driver />
-      <View slot={slots.hero} cam={shieldCam}>
-        <Shield />
+      <View slot={slots.hero} cam={deskCam}>
+        <Desk />
       </View>
       {MOMENT_SCENES.map(({ C, cam }, i) => (
         <View key={`m${i}`} slot={slots.moments[i]} cam={cam}>

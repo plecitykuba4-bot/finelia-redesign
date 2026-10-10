@@ -82,7 +82,7 @@ export function StampIcon() {
 }
 
 /* 2 · Účetnictví: tři šanony, prostřední se při najetí vysune. */
-function Binder({ x, color, out }: { x: number; color: string; out?: React.RefObject<THREE.Group | null> }) {
+export function Binder({ x, color, out }: { x: number; color: string; out?: React.RefObject<THREE.Group | null> }) {
   return (
     <group position-x={x} ref={out}>
       <RoundedBox args={[0.34, 1.3, 1.05]} radius={0.035} smoothness={3} position-y={0.65}>

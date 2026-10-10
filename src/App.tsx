@@ -1,7 +1,7 @@
 import { Component, Fragment, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, ArrowUpRight, Check, List, Phone, Plus, X, EnvelopeSimple } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowRight, ArrowUpRight, Check, List, Phone, X, EnvelopeSimple } from "@phosphor-icons/react";
 import { CONTACT, FAQ, HERO, MOMENTS, NAV, PRICES, SERVICES, STEPS, WHO, type Who } from "./content";
-import { CATS, daysBetween, fmtDate, fmtWeekday, inDays, upcoming, type Cat } from "./terminy";
+import { CATS, MONTHS_NOM, WD_SHORT, dayKey, daysBetween, fmtDate, fmtWeekday, upcoming, type Cat } from "./terminy";
 import { gsap, ScrollTrigger, reducedMotion, revealOnView, scrollToHash, startSmoothScroll } from "./lib/motion";
 import { scene, slots, trackPointer, type Slot } from "./scene/state";
 
@@ -130,7 +130,7 @@ function Hero() {
     tl.fromTo(".nav-in > *", { y: -14, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.8, ease: "power3.out", stagger: 0.06 }, 0)
       .fromTo(el.querySelectorAll(".h1 .w > span"), { yPercent: 110, autoAlpha: 1 }, { yPercent: 0, duration: 1.1, ease: "expo.out", stagger: 0.08 }, 0.1)
       .fromTo(el.querySelectorAll(".hero-copy [data-in]"), { y: 16, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.9, ease: "power3.out", stagger: 0.09 }, 0.5)
-      .fromTo(el.querySelector(".hero-side"), { y: 28, scale: 0.98, autoAlpha: 0 }, { y: 0, scale: 1, autoAlpha: 1, duration: 1.2, ease: "power3.out" }, 0.35);
+      .fromTo(el.querySelector(".hero-stage"), { autoAlpha: 0 }, { autoAlpha: 1, duration: 1.4, ease: "power2.out" }, 0.3);
     tl.eventCallback("onComplete", introDone);
     // start s načteným písmem, ať nadpis během animace neposkočí (nejdéle 700 ms)
     Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 700))]).then(() => {
@@ -146,7 +146,11 @@ function Hero() {
   const words = HERO.title.split(" ");
   return (
     <section className="hero" id="top" ref={root}>
-      <div className="wrap hero-grid">
+      {/* stůl s doklady leží přímo na pozadí hero, není to oddělený rámeček */}
+      <div className="hero-stage" data-in>
+        <Stage slot={slots.hero} className="stage stage-hero" />
+      </div>
+      <div className="wrap">
         <div className="hero-copy">
           <h1 className="h1">
             {words.map((w, i) => (
@@ -175,25 +179,6 @@ function Hero() {
               Ceník služeb
             </a>
           </div>
-        </div>
-        <div className="hero-side" data-in>
-          <Stage slot={slots.hero} className="stage stage-hero">
-            <img className="fallback" src="/img/shield.png" alt="" />
-          </Stage>
-          <dl className="hero-facts">
-            <div>
-              <dt>48 h</dt>
-              <dd>odpověď na dotaz</dd>
-            </div>
-            <div>
-              <dt>od 1 000 Kč</dt>
-              <dd>daňové přiznání</dd>
-            </div>
-            <div>
-              <dt>online</dt>
-              <dd>úvodní schůzka</dd>
-            </div>
-          </dl>
         </div>
       </div>
     </section>
@@ -277,49 +262,56 @@ function Services() {
   );
 }
 
+const STEP_MS = 3600;
+
+/* Spolupráce: animace papírů běží sama a text aktuálního kroku je přímo vedle ní v jednom panelu,
+   takže se čte a sleduje na jednom místě. Kliknutím na dílek jde krok vybrat ručně. */
 function Process() {
   const root = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState(0);
+  const [seen, setSeen] = useState(false);
+  const [paused, setPaused] = useState(false);
   useEffect(() => {
-    const st = ScrollTrigger.create({
-      trigger: root.current,
-      start: "top 60%",
-      end: "bottom 70%",
-      onUpdate: (s) => {
-        const v = Math.min(3, Math.max(0, s.progress * 3.5 - 0.25));
-        scene.steps = v;
-        setStep(Math.min(3, Math.round(v)));
-      },
-    });
-    return () => st.kill();
+    const io = new IntersectionObserver(([e]) => setSeen(e.isIntersecting), { threshold: 0.4 });
+    io.observe(root.current!);
+    return () => io.disconnect();
   }, []);
+  // 3D dojede do kroku plynule (návrat ze 4. na 1. krok je rychlejší)
+  useEffect(() => {
+    const tw = gsap.to(scene, { steps: step, duration: reducedMotion() ? 0 : step === 0 ? 1 : 1.6, ease: "power2.inOut" });
+    return () => void tw.kill();
+  }, [step]);
+  const running = seen && !paused && !reducedMotion();
+  useEffect(() => {
+    if (!running) return;
+    const t = setTimeout(() => setStep((s) => (s + 1) % STEPS.length), STEP_MS);
+    return () => clearTimeout(t);
+  }, [step, running]);
   return (
     <section className="sec process" id="spoluprace">
       <div className="wrap">
         <div className="sec-head rv">
           <h2 className="h2">Jak spolupráce probíhá?</h2>
-          <p className="lead">Čtyři kroky od první schůzky po potvrzení z úřadu. Doklady od Vás převezmeme a vrátíme je v pořádku.</p>
         </div>
-        <div className="pr-grid" ref={root}>
-          <div className="pr-steps">
-            {STEPS.map((s, i) => (
-              <div key={s.title} className={`pr-step${i === step ? " on" : ""}${i < step ? " done" : ""}`}>
-                <span className="pr-n">{i < step && <Check size={14} weight="bold" />}</span>
-                <div>
-                  <h3 className="h3">{s.title}</h3>
+        <div className="pr-card rv" ref={root} data-hold={!running} onPointerEnter={() => setPaused(true)} onPointerLeave={() => setPaused(false)}>
+          <div className="pr-text">
+            <div className="pr-steps">
+              {STEPS.map((s, i) => (
+                <div key={s.title} className={`pr-step${i === step ? " on" : ""}`} aria-hidden={i !== step}>
+                  <h3>{s.title}</h3>
                   <p>{s.text}</p>
                 </div>
-              </div>
-            ))}
-          </div>
-          <div className="pr-sticky">
-            <Stage slot={slots.papers} className="stage stage-papers" />
-            <div className="pr-meter" aria-hidden="true">
+              ))}
+            </div>
+            <div className="pr-nav">
               {STEPS.map((s, i) => (
-                <span key={s.title} className={i <= step ? "on" : ""} />
+                <button key={s.title} className={`pr-seg${i === step ? " on" : ""}${i < step ? " done" : ""}`} onClick={() => setStep(i)} aria-label={s.title} aria-pressed={i === step}>
+                  {i === step && <span key={step} style={{ animationDuration: `${STEP_MS}ms` }} />}
+                </button>
               ))}
             </div>
           </div>
+          <Stage slot={slots.papers} className="stage stage-papers" />
         </div>
       </div>
     </section>
@@ -344,92 +336,156 @@ function Pricing({ onPick }: { onPick: (subject: string) => void }) {
             ))}
           </div>
         </div>
-        <div className="price-grid">
+        <div className="pl rv">
           {list.map((p) => (
-            <article key={p.title} className="price" onPointerMove={glow}>
-              <h3 className="h4">{p.title}</h3>
-              <ul className="ticks ticks-sm">
-                {p.items.map((x) => (
-                  <li key={x}>
-                    <Check size={14} weight="bold" />
-                    {x}
-                  </li>
-                ))}
-              </ul>
-              <div className="price-foot">
-                <p className="price-v">
-                  <span>od</span> {p.price} Kč
-                  {p.unit && <small>{p.unit}</small>}
-                </p>
-                <button className="btn btn-line btn-sm" onClick={() => onPick(p.title)}>
-                  Mám zájem <ArrowUpRight size={16} weight="bold" />
-                </button>
-              </div>
-            </article>
+            <button key={p.title} className="pl-row" onClick={() => onPick(p.title)} onPointerMove={glow}>
+              <span className="pl-main">
+                <span className="pl-name">{p.title}</span>
+                <span className="pl-items">{p.items.join(" · ")}</span>
+              </span>
+              <span className="pl-price">
+                <small>od</small> {p.price} Kč{p.unit && <em>{p.unit}</em>}
+              </span>
+              <ArrowUpRight className="pl-go" size={18} weight="bold" />
+            </button>
           ))}
         </div>
-        <p className="note rv">Ceny jsou uvedené jako „od“. Konečnou cenu znáte předem, jasně a bez skrytých poplatků.</p>
+        <p className="note rv">Ceny jsou uvedené jako „od“. Konečnou cenu znáte předem, jasně a bez skrytých poplatků. Kliknutím na řádek nám pošlete poptávku.</p>
       </div>
     </section>
   );
 }
 
 function Deadlines() {
-  const today = useMemo(() => new Date(), []);
-  const all = useMemo(() => upcoming(today, 120), [today]);
+  const today = useMemo(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }, []);
+  // od prvního dne tohoto měsíce, ať kalendář ukáže i termíny, které už v měsíci proběhly
+  const all = useMemo(() => upcoming(new Date(today.getFullYear(), today.getMonth(), 1), 170), [today]);
   const [cat, setCat] = useState<Cat | "all">("all");
-  const [hot, setHot] = useState(-1);
+  const [off, setOff] = useState(0);
+  const [sel, setSel] = useState<string | null>(null);
   const list = all.filter((d) => cat === "all" || d.cat === cat);
-  const next = list[0];
+  const future = list.filter((d) => d.date >= today);
+  const next = future[0];
   const n = next ? daysBetween(today, next.date) : 0;
   const label = (c: Cat) => CATS.find((x) => x.id === c)!.label;
+  const byDay = new Map<string, typeof list>();
+  list.forEach((d) => byDay.set(dayKey(d.date), [...(byDay.get(dayKey(d.date)) ?? []), d]));
+
+  const first = new Date(today.getFullYear(), today.getMonth() + off, 1);
+  const count = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+  const lead = (first.getDay() + 6) % 7; // týden začíná pondělím
+  const cells: (Date | null)[] = [...Array(lead).fill(null), ...Array.from({ length: count }, (_, i) => new Date(first.getFullYear(), first.getMonth(), i + 1))];
+
+  const picked = sel ? byDay.get(sel) : undefined;
+  const rows = picked ?? future.slice(0, 4);
   return (
     <section className="sec deadlines" id="terminy">
       <div className="wrap">
         <div className="sec-head sec-head-row rv">
-          <div>
-            <h2 className="h2">Hlídáme termíny za Vás.</h2>
-          </div>
+          <h2 className="h2">Hlídáme termíny za Vás.</h2>
           <div className="chips" role="group" aria-label="Typ termínu">
             {CATS.map((c) => (
-              <button key={c.id} className={`chip${cat === c.id ? " on" : ""}`} aria-pressed={cat === c.id} onClick={() => setCat(c.id)}>
+              <button
+                key={c.id}
+                className={`chip${cat === c.id ? " on" : ""}`}
+                aria-pressed={cat === c.id}
+                onClick={() => {
+                  setCat(c.id);
+                  setSel(null);
+                }}
+              >
                 {c.label}
               </button>
             ))}
           </div>
         </div>
-        <div className="dl-grid rv">
-          {next && (
-            <div className="dl-next">
-              <p className="dl-big">
-                {n}
-                <span>{n === 1 ? "den" : n > 1 && n < 5 ? "dny" : "dní"}</span>
+        <div className="cal-card rv">
+          <div className="cal">
+            <div className="cal-head">
+              <p className="cal-month">
+                {MONTHS_NOM[first.getMonth()]} <span>{first.getFullYear()}</span>
               </p>
-              <p className="dl-date">
-                Nejbližší termín: {fmtDate(next.date)}, {fmtWeekday(next.date)}
-              </p>
-              <p className="dl-title">{next.title}</p>
-              <span className="tag">{label(next.cat)}</span>
+              <div className="cal-arrows">
+                <button onClick={() => setOff(off - 1)} disabled={off === 0} aria-label="Předchozí měsíc">
+                  <ArrowLeft size={18} />
+                </button>
+                <button onClick={() => setOff(off + 1)} disabled={off === 4} aria-label="Další měsíc">
+                  <ArrowRight size={18} />
+                </button>
+              </div>
             </div>
-          )}
-          <div className="dl-side">
-            <div className="dl-line" aria-hidden="true">
-              {list.map((d, i) => (
-                <i key={i} className={`${d.cat}${i === hot ? " hot" : ""}`} style={{ left: `${(daysBetween(today, d.date) / 120) * 100}%` }} />
+            <div className="cal-grid cal-wd" aria-hidden="true">
+              {WD_SHORT.map((w) => (
+                <span key={w}>{w}</span>
               ))}
-              <span className="dl-l0">dnes</span>
-              <span className="dl-l1">+120 dní</span>
             </div>
-            <ol className="dl-list">
-              {list.slice(0, 7).map((d, i) => (
-                <li key={i} onPointerEnter={() => setHot(i)} onPointerLeave={() => setHot(-1)}>
-                  <span className="dl-d">{fmtDate(d.date)}</span>
-                  <span className="dl-t">{d.title}</span>
-                  <span className={`tag tag-${d.cat}`}>{label(d.cat)}</span>
-                  <span className="dl-in">{inDays(daysBetween(today, d.date))}</span>
-                </li>
-              ))}
-            </ol>
+            <div className="cal-grid" key={off}>
+              {cells.map((d, i) => {
+                if (!d) return <span key={i} />;
+                const k = dayKey(d);
+                const items = byDay.get(k);
+                const cls = `cal-d${+d === +today ? " today" : ""}${d < today ? " past" : ""}${items ? " has" : ""}${sel === k ? " sel" : ""}`;
+                return items ? (
+                  <button key={i} className={cls} onClick={() => setSel(sel === k ? null : k)} aria-pressed={sel === k} aria-label={`${fmtDate(d)}: ${items.map((x) => x.title).join(", ")}`}>
+                    {d.getDate()}
+                    <i>
+                      {[...new Set(items.map((x) => x.cat))].map((c) => (
+                        <b key={c} className={c} />
+                      ))}
+                    </i>
+                  </button>
+                ) : (
+                  <span key={i} className={cls}>
+                    {d.getDate()}
+                  </span>
+                );
+              })}
+            </div>
+            <ul className="cal-legend" aria-hidden="true">
+              <li>
+                <b className="dane" /> Daně
+              </li>
+              <li>
+                <b className="dph" /> DPH
+              </li>
+              <li>
+                <b className="mzdy" /> Mzdy
+              </li>
+            </ul>
+          </div>
+          <div className="cal-side">
+            {next && (
+              <div className="cal-next">
+                <p className="cal-big">
+                  {n}
+                  <span>{n === 1 ? "den" : n > 1 && n < 5 ? "dny" : "dní"}</span>
+                </p>
+                <p className="cal-next-t">
+                  do nejbližšího termínu
+                  <strong>
+                    {fmtDate(next.date)}, {fmtWeekday(next.date)}
+                  </strong>
+                </p>
+              </div>
+            )}
+            <div className="cal-list">
+              <div className="cal-list-h">
+                <p>{picked ? `${fmtDate(picked[0].date)}, ${fmtWeekday(picked[0].date)}` : "Co přijde nejdřív"}</p>
+                {picked && <button onClick={() => setSel(null)}>Zobrazit nejbližší</button>}
+              </div>
+              <ol key={sel ?? cat}>
+                {rows.map((d, i) => (
+                  <li key={i}>
+                    <span className="cal-li-d">{fmtDate(d.date)}</span>
+                    <span className="cal-li-t">{d.title}</span>
+                    <span className={`tag tag-${d.cat}`}>{label(d.cat)}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
           </div>
         </div>
         <p className="note rv">Orientační přehled běžných termínů. Ty, které se týkají právě Vás, pohlídáme a připomeneme.</p>
@@ -451,7 +507,7 @@ function Faq() {
             <div key={f.q} className={`faq-i${open === i ? " on" : ""}`}>
               <button aria-expanded={open === i} onClick={() => setOpen(open === i ? -1 : i)}>
                 {f.q}
-                <Plus size={20} />
+                <span className="faq-ic" aria-hidden="true" />
               </button>
               <div className="faq-a">
                 <div>

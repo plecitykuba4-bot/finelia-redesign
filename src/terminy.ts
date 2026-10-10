@@ -80,3 +80,7 @@ const WD = ["neděle", "pondělí", "úterý", "středa", "čtvrtek", "pátek", 
 export const fmtDate = (d: Date) => `${d.getDate()}. ${MONTHS[d.getMonth()]}`;
 export const fmtWeekday = (d: Date) => WD[d.getDay()];
 export const inDays = (n: number) => (n === 0 ? "dnes" : n === 1 ? "zítra" : n < 5 ? `za ${n} dny` : `za ${n} dní`);
+
+export const MONTHS_NOM = ["Leden", "Únor", "Březen", "Duben", "Květen", "Červen", "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec"];
+export const WD_SHORT = ["Po", "Út", "St", "Čt", "Pá", "So", "Ne"];
+export const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;

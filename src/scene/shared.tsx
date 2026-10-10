@@ -8,7 +8,7 @@ import { controls } from "./state";
    na mobilu má každý rámeček vlastní; textura z PMREM jinému kontextu nepatří). */
 const envByGl = new WeakMap<THREE.WebGLRenderer, THREE.Texture>();
 
-export function Env({ intensity = 0.5 }: { intensity?: number }) {
+export function Env({ intensity = 0.5, shadow = false }: { intensity?: number; shadow?: boolean }) {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   useLayoutEffect(() => {
@@ -25,7 +25,21 @@ export function Env({ intensity = 0.5 }: { intensity?: number }) {
   return (
     <>
       <ambientLight intensity={0.35} />
-      <directionalLight position={[3, 5, 4]} intensity={1.3} />
+      {/* stejná sada světel ve všech scénách (sdílené programy); stín vrhá jen scéna, která si o něj řekne */}
+      <directionalLight
+        position={shadow ? [3.5, 8, 3] : [3, 5, 4]}
+        intensity={1.3}
+        castShadow={shadow}
+        shadow-mapSize={[1024, 1024]}
+        shadow-camera-left={-5}
+        shadow-camera-right={5}
+        shadow-camera-top={5}
+        shadow-camera-bottom={-5}
+        shadow-camera-near={1}
+        shadow-camera-far={20}
+        shadow-bias={-0.0006}
+        shadow-radius={7}
+      />
     </>
   );
 }

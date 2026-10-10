@@ -47,7 +47,7 @@ function buildPoses(i: number, spread: number): Pose[] {
   return [air, stack, fan, done];
 }
 
-export const papersCam: Cam = { fov: 30, pos: [0, 3.7, 3.0], look: [0, 0.1, 0.05] };
+export const papersCam: Cam = { fov: 30, pos: [0, 4.7, 3.7], look: [0, 0.1, 0.05] };
 
 export default function Papers() {
   const gl = useThree((s) => s.gl);

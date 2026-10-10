@@ -57,6 +57,7 @@ function Stage({ slot, cam, C }: { slot: Slot; cam: Cam; C: () => React.JSX.Elem
       className="stage-gl"
       // mimo obrazovku plátno nekreslí (viz Render), smyčka scény běží dál jen s levnými výpočty
       frameloop="always"
+      shadows
       dpr={[1, 1.5]}
       gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
       camera={{ fov: cam.fov, position: cam.pos, near: 0.1, far: 60 }}
